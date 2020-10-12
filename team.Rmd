@@ -1,0 +1,148 @@
+---
+title: "team"
+output: html_document
+---
+
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## R Markdown
+
+This is an R Markdown document. Markdown is a simple formatting syntax for authoring HTML, PDF, and MS Word documents. For more details on using R Markdown see <http://rmarkdown.rstudio.com>.
+
+When you click the **Knit** button a document will be generated that includes both content as well as the output of any embedded R code chunks within the document. You can embed an R code chunk like this:
+
+```{r}
+library(readxl)
+library(readr)
+library(tidyr)
+library(dplyr)
+library(tidyverse)
+defense <- read_excel('../ds202_lab4/cyclonesFootball2019.xlsx', sheet='Defensive')
+biography <- read_excel('../ds202_lab4/cyclonesFootball2019.xlsx', sheet='Biography')
+offensive <- read_excel('../ds202_lab4/cyclonesFootball2019.xlsx', sheet='Offensive')
+str(defense)
+str(biography)
+str(offensive)
+```
+
+```{r}
+defClean <- defense %>% mutate(name = factor(Name), opponent = factor(Opponent_Opponent)) %>% 
+            mutate(across(Tackles_Solo:Pass_PB, as.integer))%>% select(-Name, -Opponent_Opponent)
+
+offClean <- offensive %>% mutate(name = factor(Name), opponent = factor(Opponent_Opponent)) %>% 
+            mutate(across(Rushing_ATT:Passing_INT, as.integer)) %>% select(-Name, -Opponent_Opponent)
+
+bioClean <- biography %>% separate(Height, c('Feet','Inches') , sep='-') %>% mutate(total_inches = as.integer(Feet)*12 + as.integer(Inches)) %>% select(-Feet,-Inches)
+
+str(bioClean)
+str(defClean)
+str(offClean)
+ 
+```
+
+```{r}
+defClean <- defClean %>%
+  pivot_longer(Tackles_Solo:Pass_PB, names_to = "Stats")
+str(defClean)
+
+```
+
+```{r}
+aggregateDef <- aggregate(defClean$value, by= list(defClean$Stats), FUN= sum)
+aggregateDef
+ 
+```
+
+P2 2. Well the solo and group tackles are plentiful. What defensive skill is low is in the turnover column. There are very few FF, FR, and INT compared to the tackles and passing defensive skills. In the turnover category there are 10 or less in each category whereas in every other defensive category there are more than 10 by far. 
+
+```{r}
+notreDame <- defClean %>% filter( opponent =="Notre Dame" & Stats == 'Tackles_Solo')
+iowa <- defClean %>% filter( opponent =="Iowa"&Stats == 'Tackles_Solo')
+both <- rbind(iowa,notreDame)
+ggplot(both , aes(x=name, y=value , colour = opponent)) +geom_point()
+```
+
+P2 3. ISu had better solo tackling in the notre Dame game there were more notre dame points on the scatter plot that were higher than iowa. This would indicate more solo tackles at the notre dame game.
+
+```{r}
+bioClean <- biography %>% separate(Hometown, c('City','State') , sep=', ')
+head(bioClean , n=5)
+```
+
+```{r}
+bioCount <- bioClean %>% count(State)
+bioCount
+```
+
+
+##Part 3
+
+
+## 1.
+```{r}
+bioClean <- bioClean %>% rename(name = 'Name')
+offGroup <- offClean %>% select(name) %>% group_by(name)
+offGroup <-unique(offGroup)
+joinOff <- inner_join(bioClean, offGroup, by = "name")
+offState <- joinOff %>% count(State)
+ 
+
+deffGroup <-defClean %>% select(name) %>% group_by(name)
+deffGroup <-unique(deffGroup)
+joinDef <- inner_join(bioClean, deffGroup, by = "name")
+joinDef <- joinDef %>% count(State)
+
+offState
+joinDef
+
+```
+
+
+2.
+If brock purdy is doing well then there is alot of passing yards, which would open up the field and let in alot of rushing yards
+```{r}
+brock <- offClean %>%  filter(name == "Purdy, Brock") %>% select(opponent, Passing_YDS, Passing_TD, Passing_INT)
+
+rushing <- offClean %>% group_by(opponent) %>% summarize(rush_yds = sum(Rushing_YDS,na.rm = TRUE), rush_attp = sum(Rushing_ATT,na.rm = TRUE), rtd = sum(Rushing_TD,na.rm = TRUE))
+combineStats <- inner_join(rushing, brock, by="opponent")
+combineStats
+ggplot(combineStats, aes(Passing_YDS, rush_yds, shape = factor(Passing_TD), colour = rtd)) + geom_point()
+```
+Looking at the data when Brock Purdy throws the ball well that day. There seems to be more rushing yds and rushing tds. If he doesnt throw well that day they seem to get less rushing yds and tds from the looks of the graph.
+
+##Clean some data
+```{r}
+defense2 <- read_excel('../ds202_lab4/cyclonesFootball2018.xlsx', sheet='Defensive')
+biography2 <- read_excel('../ds202_lab4/cyclonesFootball2018.xlsx', sheet='Biography')
+offensive2 <- read_excel('../ds202_lab4/cyclonesFootball2018.xlsx', sheet='Offensive')
+
+defClean2 <- defense2 %>% mutate(name = factor(Name), opponent = factor(Opponent_Opponent)) %>% 
+            mutate(across(Tackles_Solo:Pass_PB, as.integer))%>% select(-Name, -Opponent_Opponent)
+
+offClean2 <- offensive2 %>% mutate(name = factor(Name), opponent = factor(Opponent_Opponent)) %>% 
+            mutate(across(Rushing_ATT:Passing_INT, as.integer)) %>% select(-Name, -Opponent_Opponent)
+
+bioClean2 <- biography2 %>% separate(Height, c('Feet','Inches') , sep='-') %>% mutate(total_inches = as.integer(Feet)*12 + as.integer(Inches)) %>% select
+
+ defClean2<-defClean2 %>%
+  pivot_longer(Tackles_Solo:Pass_PB, names_to = "Stats")
+str(defClean2)
+
+```
+
+##Compare some data
+The data will only have shared opponents to see how much they really improved against common data points
+```{r}
+twoDef <- inner_join(defClean2, defClean , by= c("name" , "Stats", "opponent"))
+twoDef <- twoDef %>% group_by(Stats) %>% rename(twentyEighteen = value.x , twentyNineteen = value.y) %>% filter(Stats== 'Tackles_Solo')
+twoDef <- twoDef %>% pivot_longer(twentyEighteen:twentyNineteen , names_to = "year")
+twoDef 
+ggplot(twoDef, aes(value, twoDef$opponent, colour = year)) + geom_point() + facet_wrap(twoDef$name) +labs(title = "Comparing Solo tackles",
+         x = "NUmber of tackles",
+         y = "Player Names")
+```
+
+defensively you can see that Landers akers had more solo tackles across all games in 2019. Another noticable play is Anothony Johnson who improved his tackling immensly by recording more in 2019 vs 2018. Since solo tackles was used to see if a defense was good that game for this question I also assumed that if a player recorded more solo tackles in 2019 vs 2018 then they improved their game.
